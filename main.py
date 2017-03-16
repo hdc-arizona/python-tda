@@ -77,6 +77,8 @@ def reduce_column(left, right):
             j += 1
     return result
 
+##############################################################################
+
 class SimplicialComplex(object):
 
     def __init__(self, faces, vertex_order=functools.cmp_to_key(set_lexicographical_cmp)):
@@ -123,14 +125,20 @@ class SimplicialComplex(object):
             while mx in low_inv:
                 col_to_reduce = bm[low_inv[mx]]
                 new_col = reduce_column(col_to_reduce, col)
-                print("%s: Reducing %s and %s to %s" % (i, col_to_reduce, col, new_col))
                 col = new_col
                 bm[i] = col
                 if len(col) == 0:
+                    mx = None
                     break
                 mx = col[-1]
-            low[i] = mx
-            low_inv[mx] = i
+            if mx is None:
+                if i in low:
+                    t = low[i]
+                    del low_inv[t]
+                    del low[i]
+            else:
+                low[i] = mx
+                low_inv[mx] = i
             if len(col) == 0:
                 face = self.faces[i]
                 dim = len(face)
@@ -140,10 +148,24 @@ class SimplicialComplex(object):
                 dim = len(face)
                 betti[dim-2] = betti.get(dim-2, 0) - 1
                 
-        return bm, betti
+        return bm, betti, low, low_inv
+
+
+##############################################################################
 
 def from_faces(lst):
     return SimplicialComplex([frozenset(v) for v in lst])
+
+def report_persistence(complex):
+    red = complex.reduce_boundary_matrix()
+    print(red[0])
+    print(red[1])
+    for (col, row) in sorted(red[2].items()):
+        print("Birth: %s - Death: %s (persistence: %d)" % (ex1.faces[row], ex1.faces[col], col - row))
+    print("Infinitely persistent components:")
+    for i, col in enumerate(red[0]):
+        if len(col) == 0 and i not in red[3]:
+            print("Birth: %s" % ex1.faces[i])
 
 ex1 = from_faces([[1,2], [2,3],
                   [4,5], [5,6],
@@ -151,7 +173,20 @@ ex1 = from_faces([[1,2], [2,3],
                   [1,4], [4,7],
                   [2,5], [5,8],
                   [3,6], [6,9]])
+ex2 = from_faces([[1,2,3]])
+ex3 = from_faces([[1,2,3],[2,3,4]])
+ex4 = from_faces([[1,2,3], [1,2,4], [1,3,4], [2,3,4]])
 
-print(ex1.boundary_matrix())
-print(ex1.reduce_boundary_matrix())
-                         
+print("Complex 1:")
+report_persistence(ex1)
+print("\nComplex 2:")
+report_persistence(ex2)
+print("\nComplex 3:")
+report_persistence(ex3)
+print("\nComplex 4:")
+report_persistence(ex4)
+
+
+
+# print(ex1.boundary_matrix())
+
