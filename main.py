@@ -2,6 +2,8 @@
 
 import functools
 
+##############################################################################
+
 class Chain(object):
 
     def __init__(self, faces):
@@ -84,7 +86,6 @@ class SimplicialComplex(object):
     def __init__(self, faces, vertex_order=functools.cmp_to_key(set_lexicographical_cmp)):
         self.face_sorter = lambda k: (len(k), vertex_order(k))
         self.face_set = set(faces)
-        # include all faces
         self.faces = []
         to_process = sorted(faces, key=lambda k: len(k))
         while len(to_process) > 0:
@@ -150,7 +151,70 @@ class SimplicialComplex(object):
                 
         return bm, betti, low, low_inv
 
+    # must decide vertex order
+    def __add__(self, other):
+        return SimplicialComplex(self.face_set.union(other.face_set))
+    def __mul__(self, other):
+        return SimplicialComplex(self.face_set.intersection(other.face_set))
 
+class Cover(object):
+    def __init__(self, cpx, vertex_map):
+        # build subcomplexes
+        subcomplex_map = {}
+        self.subcomplexes = {}
+        self.complex = cpx
+        for face in cpx.face_set:
+            dest = min(vertex_map[i] for i in face)
+            subcomplex_map.setdefault(dest, []).append(face)
+        for (complex_id, subcomplex_faces) in subcomplex_map.items():
+            self.subcomplexes[complex_id] = SimplicialComplex(subcomplex_faces)
+        self.vertex_map = vertex_map
+
+    # product here means the coarsest refinement of both covers
+    # it's only defined when both covers cover the same simplicial complex
+    def __mul__(self, other):
+        new_vertex_map = {}
+        for v in self.vertex_map.keys():
+            new_vertex_map[v] = (self.vertex_map[v], other.vertex_map[v])
+        return Cover(self.complex, new_vertex_map)
+
+class BlowupComplex(object):
+
+    def __init__(self, cover):
+        self.cover = cover
+        self.subcomplexes = {}
+        
+        # base subcomplexes
+        for (complex_id, subcomplex) in cover.subcomplexes.items():
+            self.subcomplexes[frozenset([complex_id])] = subcomplex
+
+        base_complex_list = list(cover.subcomplexes.items())
+        
+        prev_set = self.subcomplexes
+        
+        # intersections
+
+        while len(prev_set) > 0:
+            next_set = {}
+            # complex_id is a frozenset
+            for (complex_id, subcomplex) in prev_set.items():
+                # other_complex_id is a potential element of the sets in complex_id
+                for (other_complex_id, other_subcomplex) in base_complex_list:
+                    intersection_id = complex_id.union(frozenset([other_complex_id]))
+                    if other_complex_id in complex_id:
+                        # this base complex is already in our intersection, not interesting
+                        continue
+                    if intersection_id in next_set:
+                        # we've already computed this, continue
+                        continue
+                    intersection_complex = subcomplex * other_subcomplex
+                    if len(intersection_complex.face_set) > 0:
+                        print("New intersection: %s" % intersection_id)
+                        next_set[intersection_id] = intersection_complex
+            self.subcomplexes.update(next_set)
+            prev_set = next_set
+
+        
 ##############################################################################
 
 def from_faces(lst):
@@ -158,35 +222,21 @@ def from_faces(lst):
 
 def report_persistence(complex):
     red = complex.reduce_boundary_matrix()
+    print("Reduced matrix")
     print(red[0])
-    print(red[1])
+    print("\nBetti numbers")
+    for (b, i) in sorted(red[1].items()):
+        print("  %d: %d" % (b, i))
+    print("\nPersistence diagram")
     for (col, row) in sorted(red[2].items()):
-        print("Birth: %s - Death: %s (persistence: %d)" % (ex1.faces[row], ex1.faces[col], col - row))
-    print("Infinitely persistent components:")
+        print("  Birth: %s - Death: %s (persistence: %d)" %
+              (sorted(list(ex1.faces[row])),
+               sorted(list(ex1.faces[col])), col - row))
+    print(" Infinitely persistent components:")
     for i, col in enumerate(red[0]):
         if len(col) == 0 and i not in red[3]:
-            print("Birth: %s" % ex1.faces[i])
-
-ex1 = from_faces([[1,2], [2,3],
-                  [4,5], [5,6],
-                  [7,8], [8,9],
-                  [1,4], [4,7],
-                  [2,5], [5,8],
-                  [3,6], [6,9]])
-ex2 = from_faces([[1,2,3]])
-ex3 = from_faces([[1,2,3],[2,3,4]])
-ex4 = from_faces([[1,2,3], [1,2,4], [1,3,4], [2,3,4]])
-
-print("Complex 1:")
-report_persistence(ex1)
-print("\nComplex 2:")
-report_persistence(ex2)
-print("\nComplex 3:")
-report_persistence(ex3)
-print("\nComplex 4:")
-report_persistence(ex4)
-
-
+            print("  Birth: %s" % ex1.faces[i])
 
 # print(ex1.boundary_matrix())
+
 
