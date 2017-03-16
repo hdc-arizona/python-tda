@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import functools
 
@@ -61,6 +61,8 @@ def set_lexicographical_cmp(s1, s2):
             return 1
     return 0
 
+set_lexicographical_key = functools.cmp_to_key(set_lexicographical_cmp)
+
 def reduce_column(left, right):
     result = []
     i = 0
@@ -81,12 +83,14 @@ def reduce_column(left, right):
 
 ##############################################################################
 
-class SimplicialComplex(object):
 
-    def __init__(self, faces, vertex_order=functools.cmp_to_key(set_lexicographical_cmp)):
+
+class SimplicialComplex(object):
+    def __init__(self, faces, vertex_order=set_lexicographical_key):
         self.face_sorter = lambda k: (len(k), vertex_order(k))
         self.face_set = set(faces)
         self.faces = []
+        # Finds the closure of the set of faces
         to_process = sorted(faces, key=lambda k: len(k))
         while len(to_process) > 0:
             old_to_process = to_process
@@ -102,15 +106,13 @@ class SimplicialComplex(object):
         self.faces = sorted(self.face_set, key=self.face_sorter)
         self.face_id = {}
         for face in self.faces:
-            self.face_id[face] = len(self.face_id)
-
+            self.face_id[face] = len(self.face_id) # self.face_id[self.faces[i]] == i
     def boundary_matrix(self):
         cols = []
         for face in self.faces:
             b = [self.face_id[f] for f in Simplex(face).boundary()]
             cols.append(sorted(b))
         return cols
-
     def reduce_boundary_matrix(self):
         betti = {}
         bm = self.boundary_matrix()
@@ -148,14 +150,12 @@ class SimplicialComplex(object):
                 face = self.faces[i]
                 dim = len(face)
                 betti[dim-2] = betti.get(dim-2, 0) - 1
-                
         return bm, betti, low, low_inv
-
     # must decide vertex order
     def __add__(self, other):
-        return SimplicialComplex(self.face_set.union(other.face_set))
+        return SimplicialComplex(self.face_set.union(other.face_set), self.face_sorter)
     def __mul__(self, other):
-        return SimplicialComplex(self.face_set.intersection(other.face_set))
+        return SimplicialComplex(self.face_set.intersection(other.face_set), self.face_sorter)
 
 class Cover(object):
     def __init__(self, cpx, vertex_map):
@@ -169,7 +169,6 @@ class Cover(object):
         for (complex_id, subcomplex_faces) in subcomplex_map.items():
             self.subcomplexes[complex_id] = SimplicialComplex(subcomplex_faces)
         self.vertex_map = vertex_map
-
     # product here means the coarsest refinement of both covers
     # it's only defined when both covers cover the same simplicial complex
     def __mul__(self, other):
@@ -187,13 +186,10 @@ class BlowupComplex(object):
         # base subcomplexes
         for (complex_id, subcomplex) in cover.subcomplexes.items():
             self.subcomplexes[frozenset([complex_id])] = subcomplex
-
         base_complex_list = list(cover.subcomplexes.items())
-        
         prev_set = self.subcomplexes
         
         # intersections
-
         while len(prev_set) > 0:
             next_set = {}
             # complex_id is a frozenset
@@ -209,12 +205,35 @@ class BlowupComplex(object):
                         continue
                     intersection_complex = subcomplex * other_subcomplex
                     if len(intersection_complex.face_set) > 0:
-                        print("New intersection: %s" % intersection_id)
                         next_set[intersection_id] = intersection_complex
             self.subcomplexes.update(next_set)
             prev_set = next_set
 
+        self.vertex_order = lambda k: (set_lexicographical_key(k[1]), set_lexicographical_key(k[0]))
+
+        self.faces = []
+        for cpx_key, cpx in self.subcomplexes.items():
+            self.faces.extend((face, cpx_key) for face in cpx.faces)
+        self.faces = sorted(self.faces, key=self.vertex_order)
+        self.face_id = {}
+        for face in self.faces:
+            self.face_id[face] = len(self.face_id) # self.face_id[self.faces[i]] == i
+
+    def reduce_boundary_matrix(self, complex_id):
+        if len(complex_id) == 1:
+            # FIXME still need to change the ids to match boundary complex ids
+            return self.subcomplexes[complex_id].reduce_boundary_matrix()
         
+        raise Exception("unimplemented")
+
+    def compute_mapping(self, subcomplex):
+        sc = self.subcomplexes[subcomplex]
+        result = {}
+        for face in sc.faces:
+            compound_face = (face, subcomplex)
+            result[sc.face_id[face]] = self.face_id[compound_face]
+        return result
+    
 ##############################################################################
 
 def from_faces(lst):
@@ -230,12 +249,12 @@ def report_persistence(complex):
     print("\nPersistence diagram")
     for (col, row) in sorted(red[2].items()):
         print("  Birth: %s - Death: %s (persistence: %d)" %
-              (sorted(list(ex1.faces[row])),
-               sorted(list(ex1.faces[col])), col - row))
+              (sorted(list(complex.faces[row])),
+               sorted(list(complex.faces[col])), col - row))
     print(" Infinitely persistent components:")
     for i, col in enumerate(red[0]):
         if len(col) == 0 and i not in red[3]:
-            print("  Birth: %s" % ex1.faces[i])
+            print("  Birth: %s" % complex.faces[i])
 
 # print(ex1.boundary_matrix())
 
