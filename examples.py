@@ -1,5 +1,6 @@
 from main import *
 
+ex0 = from_faces([[1,2], [2,3]])
 ex1 = from_faces([[1,2], [2,3],
                   [4,5], [5,6],
                   [7,8], [8,9],
@@ -19,7 +20,10 @@ def simple_examples():
     report_persistence(ex3)
     print("\nComplex 4:")
     report_persistence(ex4)
+
 ##############################################################################
+
+# c1 = Cover(ex0, {1: 1, 2: 2, 3: 2})
 
 c1 = Cover(ex1, {1: 1, 2: 2, 3: 2,
                  4: 1, 5: 2, 6: 2,
@@ -67,7 +71,9 @@ bc1 = BlowupComplex(c1)
 
 for face in bc1.faces:
     print("%s: %s" % (compound_face(face), bc1.face_id[face]))
-print(bc1.boundary_matrix())
+# print(bc1.subcomplexes[frozenset([1])].boundary_matrix())
+
+# print(bc1.boundary_matrix())
 print(bc1.reduce_boundary_matrix())
 
 # def report_sc(s):

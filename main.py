@@ -41,7 +41,8 @@ class Simplex(object):
         result = []
         for v in self.set:
             s = self.set - frozenset([v])
-            result.append(s)
+            if len(s) > 0:
+                result.append(s)
         return result
 
 ##############################################################################
@@ -89,7 +90,7 @@ def reduce_boundary_matrix(bm, self): # FIXME: yeah, ugly.
     for i, col in enumerate(bm):
         if len(col) == 0:
             face = self.faces[i]
-            dim = len(face)
+            dim = self.face_dim(face)
             betti[dim-1] = betti.get(dim-1, 0) + 1
             continue
         mx = col[-1]
@@ -112,20 +113,24 @@ def reduce_boundary_matrix(bm, self): # FIXME: yeah, ugly.
             low_inv[mx] = i
         if len(col) == 0:
             face = self.faces[i]
-            dim = len(face)
+            dim = self.face_dim(face)
             betti[dim-1] = betti.get(dim-1, 0) + 1
         else:
             face = self.faces[i]
-            dim = len(face)
+            dim = self.face_dim(face)
             betti[dim-2] = betti.get(dim-2, 0) - 1
     return bm, betti, low, low_inv
     
 
 class SimplicialComplex(object):
+
+    def face_dim(self, face):
+        print("Face %s has dim %s" % (face, len(face)))
+        return len(face)
+    
     def __init__(self, faces, vertex_order=set_lexicographical_key):
         self.face_sorter = lambda k: (len(k), vertex_order(k))
         self.face_set = set(faces)
-        self.face_set.add(frozenset())
         self.faces = []
         # Finds the closure of the set of faces
         to_process = sorted(faces, key=lambda k: len(k))
@@ -166,7 +171,6 @@ class Cover(object):
         self.subcomplexes = {}
         self.complex = cpx
         for face in cpx.face_set:
-            if len(face) == 0: continue # skip empty face, it gets included anyway
             dest = min(vertex_map[i] for i in face)
             subcomplex_map.setdefault(dest, []).append(face)
         for (complex_id, subcomplex_faces) in subcomplex_map.items():
@@ -181,6 +185,9 @@ class Cover(object):
         return Cover(self.complex, new_vertex_map)
 
 class BlowupComplex(object):
+
+    def face_dim(self, face):
+        return len(face[0]) + len(face[1]) - 1
 
     def __init__(self, cover):
         self.cover = cover
@@ -215,7 +222,6 @@ class BlowupComplex(object):
         self.vertex_order = lambda k: (set_lexicographical_key(k[1]), set_lexicographical_key(k[0]))
 
         self.faces = []
-        self.faces.append((frozenset(), frozenset()))
         for cpx_key, cpx in self.subcomplexes.items():
             self.faces.extend((face, cpx_key) for face in cpx.faces)
         self.faces = sorted(self.faces, key=self.vertex_order)
@@ -234,10 +240,6 @@ class BlowupComplex(object):
             result = []
             for i, col in enumerate(bm):
                 result.append((m[i], [m[j] for j in col]))
-            # we know that the first simplex in the boundary matrix is the
-            # dummy simplex. So we set the boundary map of that one to include
-            # the blowup dummy simplex, to make it all work.
-            result[0][1].append(0)
             return result
         bm = self.subcomplexes[complex_id].boundary_matrix()
         result = []
