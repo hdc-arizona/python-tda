@@ -74,8 +74,12 @@ for face in bc1.faces:
 # print(bc1.subcomplexes[frozenset([1])].boundary_matrix())
 
 # print(bc1.boundary_matrix())
-print(bc1.reduce_boundary_matrix())
-
+# print(bc1.reduce_boundary_matrix())
+# print()
+# print(bc1.reduced_boundary_matrices[frozenset([1])])
+# print(bc1.reduced_boundary_matrices[frozenset([2])])
+# print(bc1.reduced_boundary_matrices[frozenset([1,2])])
+print(bc1.reduce_boundary_matrix_2())
 # def report_sc(s):
 #     for face in bc1.subcomplexes[s].faces:
 #         print("%s: %s" % (simple_face(face), bc1.subcomplexes[s].face_id[face]))

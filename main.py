@@ -231,6 +231,15 @@ class BlowupComplex(object):
         self.subcomplex_mappings = dict((k, self.compute_mapping(k))
                                         for k in self.subcomplexes.keys())
 
+        self.reduced_boundary_matrices = {}
+        for cpx_key in self.subcomplexes.keys():
+            bm = self.boundary_matrix_subcomplex(cpx_key)
+            col_ids  = [v[0] for v in bm]
+            col_vals = [v[1] for v in bm]
+            rbm = reduce_boundary_matrix(col_vals, self)
+            self.reduced_boundary_matrices[cpx_key] = list(zip(col_ids, rbm[0]))
+
+
     # this returns a matrix in a slightly-different format, where the
     # columns are explicitly indexed
     def boundary_matrix_subcomplex(self, complex_id):
@@ -291,7 +300,23 @@ class BlowupComplex(object):
     def reduce_boundary_matrix(self):
         bm = self.boundary_matrix()
         return reduce_boundary_matrix(bm, self)
-    
+
+    # Uses pre-reduced matrices and glues them together with blowup complex.
+    def reduce_boundary_matrix_2(self):
+        lst = []
+        for col in self.reduced_boundary_matrices.values():
+            lst.extend(col)
+        lst.sort()
+        l = max(v[0] for v in lst)
+        result = []
+        for i in range(l+1):
+            result.append([])
+        for (i, col) in lst:
+            result[i] = col
+        print(result)
+        return reduce_boundary_matrix(result, self)
+        raise Exception("not done")
+
 ##############################################################################
 
 def from_faces(lst):
