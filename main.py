@@ -48,17 +48,17 @@ class Simplex(object):
 ##############################################################################
 
 def set_lexicographical_cmp(s1, s2):
-    if len(s1) < len(s2):
-        return -1
-    elif len(s1) > len(s2):
-        return 1
-    l1 = sorted(s1)
-    l2 = sorted(s2)
+    l1 = sorted(s1)[::-1]
+    l2 = sorted(s2)[::-1]
     for el1, el2 in zip(l1, l2):
         if el1 < el2:
             return -1
         elif el1 > el2:
             return 1
+    if len(s1) < len(s2):
+        return -1
+    elif len(s1) > len(s2):
+        return 1
     return 0
 
 set_lexicographical_key = functools.cmp_to_key(set_lexicographical_cmp)
@@ -219,7 +219,7 @@ class BlowupComplex(object):
             self.subcomplexes.update(next_set)
             prev_set = next_set
 
-        self.vertex_order = lambda k: (set_lexicographical_key(k[1]), set_lexicographical_key(k[0]))
+        self.vertex_order = lambda k: (set_lexicographical_key(k[0]), set_lexicographical_key(k[1]))
 
         self.faces = []
         for cpx_key, cpx in self.subcomplexes.items():
