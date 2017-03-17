@@ -41,8 +41,7 @@ class Simplex(object):
         result = []
         for v in self.set:
             s = self.set - frozenset([v])
-            if len(s) > 0:
-                result.append(s)
+            result.append(s)
         return result
 
 ##############################################################################
@@ -83,12 +82,50 @@ def reduce_column(left, right):
 
 ##############################################################################
 
-
+def reduce_boundary_matrix(bm, self): # FIXME: yeah, ugly.
+    betti = {}
+    low     = {} # from col indices to low[i]
+    low_inv = {} # from low[i] to col indices
+    for i, col in enumerate(bm):
+        if len(col) == 0:
+            face = self.faces[i]
+            dim = len(face)
+            betti[dim-1] = betti.get(dim-1, 0) + 1
+            continue
+        mx = col[-1]
+        while mx in low_inv:
+            col_to_reduce = bm[low_inv[mx]]
+            new_col = reduce_column(col_to_reduce, col)
+            col = new_col
+            bm[i] = col
+            if len(col) == 0:
+                mx = None
+                break
+            mx = col[-1]
+        if mx is None:
+            if i in low:
+                t = low[i]
+                del low_inv[t]
+                del low[i]
+        else:
+            low[i] = mx
+            low_inv[mx] = i
+        if len(col) == 0:
+            face = self.faces[i]
+            dim = len(face)
+            betti[dim-1] = betti.get(dim-1, 0) + 1
+        else:
+            face = self.faces[i]
+            dim = len(face)
+            betti[dim-2] = betti.get(dim-2, 0) - 1
+    return bm, betti, low, low_inv
+    
 
 class SimplicialComplex(object):
     def __init__(self, faces, vertex_order=set_lexicographical_key):
         self.face_sorter = lambda k: (len(k), vertex_order(k))
         self.face_set = set(faces)
+        self.face_set.add(frozenset())
         self.faces = []
         # Finds the closure of the set of faces
         to_process = sorted(faces, key=lambda k: len(k))
@@ -114,43 +151,8 @@ class SimplicialComplex(object):
             cols.append(sorted(b))
         return cols
     def reduce_boundary_matrix(self):
-        betti = {}
         bm = self.boundary_matrix()
-        low     = {} # from col indices to low[i]
-        low_inv = {} # from low[i] to col indices
-        for i, col in enumerate(bm):
-            if len(col) == 0:
-                face = self.faces[i]
-                dim = len(face)
-                betti[dim-1] = betti.get(dim-1, 0) + 1
-                continue
-            mx = col[-1]
-            while mx in low_inv:
-                col_to_reduce = bm[low_inv[mx]]
-                new_col = reduce_column(col_to_reduce, col)
-                col = new_col
-                bm[i] = col
-                if len(col) == 0:
-                    mx = None
-                    break
-                mx = col[-1]
-            if mx is None:
-                if i in low:
-                    t = low[i]
-                    del low_inv[t]
-                    del low[i]
-            else:
-                low[i] = mx
-                low_inv[mx] = i
-            if len(col) == 0:
-                face = self.faces[i]
-                dim = len(face)
-                betti[dim-1] = betti.get(dim-1, 0) + 1
-            else:
-                face = self.faces[i]
-                dim = len(face)
-                betti[dim-2] = betti.get(dim-2, 0) - 1
-        return bm, betti, low, low_inv
+        return reduce_boundary_matrix(bm, self)
     # must decide vertex order
     def __add__(self, other):
         return SimplicialComplex(self.face_set.union(other.face_set), self.face_sorter)
@@ -164,6 +166,7 @@ class Cover(object):
         self.subcomplexes = {}
         self.complex = cpx
         for face in cpx.face_set:
+            if len(face) == 0: continue # skip empty face, it gets included anyway
             dest = min(vertex_map[i] for i in face)
             subcomplex_map.setdefault(dest, []).append(face)
         for (complex_id, subcomplex_faces) in subcomplex_map.items():
@@ -212,14 +215,51 @@ class BlowupComplex(object):
         self.vertex_order = lambda k: (set_lexicographical_key(k[1]), set_lexicographical_key(k[0]))
 
         self.faces = []
+        self.faces.append((frozenset(), frozenset()))
         for cpx_key, cpx in self.subcomplexes.items():
             self.faces.extend((face, cpx_key) for face in cpx.faces)
         self.faces = sorted(self.faces, key=self.vertex_order)
         self.face_id = {}
         for face in self.faces:
             self.face_id[face] = len(self.face_id) # self.face_id[self.faces[i]] == i
+        self.subcomplex_mappings = dict((k, self.compute_mapping(k))
+                                        for k in self.subcomplexes.keys())
 
-    def reduce_boundary_matrix(self, complex_id):
+    # this returns a matrix in a slightly-different format, where the
+    # columns are explicitly indexed
+    def boundary_matrix_subcomplex(self, complex_id):
+        m = self.subcomplex_mappings[complex_id]
+        if len(complex_id) == 1:
+            bm = self.subcomplexes[complex_id].boundary_matrix()
+            result = []
+            for i, col in enumerate(bm):
+                result.append((m[i], [m[j] for j in col]))
+            # we know that the first simplex in the boundary matrix is the
+            # dummy simplex. So we set the boundary map of that one to include
+            # the blowup dummy simplex, to make it all work.
+            result[0][1].append(0)
+            return result
+        bm = self.subcomplexes[complex_id].boundary_matrix()
+        result = []
+        boundary = Simplex(complex_id).boundary()
+        for i, col in enumerate(bm):
+            col_index = m[i]
+            col_id = self.faces[col_index]
+            # delta(sigma * J) = (delta sigma * J) + (sigma * delta J)
+
+            # (delta sigma * J)
+            new_col = [m[j] for j in col]
+
+            # (sigma * delta J)
+            for face in boundary:
+                boundary_col_id = self.face_id[(col_id[0], face)]
+                new_col.append(boundary_col_id)
+            new_col.sort()
+            
+            result.append((m[i], new_col))
+        return result
+
+    def reduce_boundary_matrix_subcomplex(self, complex_id):
         if len(complex_id) == 1:
             # FIXME still need to change the ids to match boundary complex ids
             return self.subcomplexes[complex_id].reduce_boundary_matrix()
@@ -233,6 +273,22 @@ class BlowupComplex(object):
             compound_face = (face, subcomplex)
             result[sc.face_id[face]] = self.face_id[compound_face]
         return result
+
+    def boundary_matrix(self):
+        lst = []
+        for cpx_id in self.subcomplexes.keys():
+            lst.extend(self.boundary_matrix_subcomplex(cpx_id))
+        l = max(v[0] for v in lst)
+        result = []
+        for i in range(l+1):
+            result.append([])
+        for (i, col) in lst:
+            result[i] = col
+        return result
+
+    def reduce_boundary_matrix(self):
+        bm = self.boundary_matrix()
+        return reduce_boundary_matrix(bm, self)
     
 ##############################################################################
 
@@ -241,20 +297,22 @@ def from_faces(lst):
 
 def report_persistence(complex):
     red = complex.reduce_boundary_matrix()
-    print("Reduced matrix")
-    print(red[0])
-    print("\nBetti numbers")
+    print("  Boundary matrix")
+    print("  %s" % complex.boundary_matrix())
+    print("\n  Reduced matrix")
+    print("  %s" % red[0])
+    print("\n  Betti numbers")
     for (b, i) in sorted(red[1].items()):
-        print("  %d: %d" % (b, i))
-    print("\nPersistence diagram")
+        print("    %d: %d" % (b, i))
+    print("\n  Persistence diagram")
     for (col, row) in sorted(red[2].items()):
-        print("  Birth: %s - Death: %s (persistence: %d)" %
+        print("    Birth: %s - Death: %s (persistence: %d)" %
               (sorted(list(complex.faces[row])),
                sorted(list(complex.faces[col])), col - row))
-    print(" Infinitely persistent components:")
+    print("   Infinitely persistent components:")
     for i, col in enumerate(red[0]):
         if len(col) == 0 and i not in red[3]:
-            print("  Birth: %s" % complex.faces[i])
+            print("    Birth: %s" % complex.faces[i])
 
 # print(ex1.boundary_matrix())
 
