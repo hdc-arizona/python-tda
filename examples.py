@@ -35,32 +35,6 @@ c2 = Cover(ex1, {1: 1, 2: 1, 3: 1,
 
 c12 = c1 * c2
 
-# print(c1.subcomplexes[1].faces)
-# print(c1.subcomplexes[2].faces)
-
-# report_persistence(c1.subcomplexes[1])
-# print("\n\n\n")
-# report_persistence(c1.subcomplexes[2])
-
-# print("\n")
-# print(c2.subcomplexes[1].faces)
-# print(c1.subcomplexes[2].faces)
-# c12 = c1 * c2
-# print("\n")
-# print("11: %s" % c12.subcomplexes[(1,1)].faces)
-# print("12: %s" % c12.subcomplexes[(1,2)].faces)
-# print("21: %s" % c12.subcomplexes[(2,1)].faces)
-# print("22: %s" % c12.subcomplexes[(2,2)].faces)
-
-# for sc_id, sc in bc1.subcomplexes.items():
-#     print("%s: %s" % (sc_id, sc.faces))
-
-# print(bc1.reduce_boundary_matrix(frozenset([1])))
-# print(bc1.reduce_boundary_matrix(frozenset([2])))
-# print(bc1.reduce_boundary_matrix(frozenset([1,2])))
-
-# print(bc1.subcomplexes[frozenset([1,2])].faces)
-
 def compound_face(k):
     (k1, k2) = k
     return "([%s],[%s])" % (",".join(str(v) for v in k1),
@@ -68,33 +42,9 @@ def compound_face(k):
 def simple_face(k):
     return "[%s]" % (",".join(str(v) for v in k))
 
-bc1 = BlowupComplex(c1)
+# bc1 = BlowupComplex(c1)
 
 bc12 = BlowupComplex(c12)
 
-# print(bc1.boundary_matrix_subcomplex(frozenset([1])))
-# print(bc1.boundary_matrix_subcomplex(frozenset([2])))
-
-# for face in bc1.faces:
-#     print("%s: %s" % (compound_face(face), bc1.face_id[face]))
-# print(bc1.subcomplexes[frozenset([1])].boundary_matrix())
-
-# print(bc1.boundary_matrix())
-# print(bc1.reduce_boundary_matrix())
-# print()
-# print(bc1.reduced_boundary_matrices[frozenset([1])])
-# print(bc1.reduced_boundary_matrices[frozenset([2])])
-# print(bc1.reduced_boundary_matrices[frozenset([1,2])])
-print(bc12.reduce_boundary_matrix_2())
-
-# print(bc12.reduce_boundary_matrix_2())
-
-# def report_sc(s):
-#     for face in bc1.subcomplexes[s].faces:
-#         print("%s: %s" % (simple_face(face), bc1.subcomplexes[s].face_id[face]))
-#     print("%s" % bc1.compute_mapping(s))
-
-# report_sc(frozenset([1]))
-# report_sc(frozenset([2]))
-# report_sc(frozenset([1,2]))
+print(bc12.reduce_boundary_matrix_partial([(1, 2), (2, 1), (2, 2)])[1])
 

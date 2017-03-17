@@ -83,13 +83,15 @@ def reduce_column(left, right):
 
 ##############################################################################
 
-def reduce_boundary_matrix(bm, self): # FIXME: yeah, ugly.
+def reduce_boundary_matrix(bm, self, col_ids=None): # FIXME: yeah, ugly.
+    if col_ids == None:
+        col_ids = list(range(len(bm)))
     betti = {}
     low     = {} # from col indices to low[i]
     low_inv = {} # from low[i] to col indices
     for i, col in enumerate(bm):
         if len(col) == 0:
-            face = self.faces[i]
+            face = self.faces[col_ids[i]]
             dim = self.face_dim(face)
             betti[dim-1] = betti.get(dim-1, 0) + 1
             continue
@@ -112,11 +114,11 @@ def reduce_boundary_matrix(bm, self): # FIXME: yeah, ugly.
             low[i] = mx
             low_inv[mx] = i
         if len(col) == 0:
-            face = self.faces[i]
+            face = self.faces[col_ids[i]]
             dim = self.face_dim(face)
             betti[dim-1] = betti.get(dim-1, 0) + 1
         else:
-            face = self.faces[i]
+            face = self.faces[col_ids[i]]
             dim = self.face_dim(face)
             betti[dim-2] = betti.get(dim-2, 0) - 1
     return bm, betti, low, low_inv
@@ -318,6 +320,36 @@ class BlowupComplex(object):
         print(result)
         return reduce_boundary_matrix(result, self)
         raise Exception("not done")
+
+    def reduce_boundary_matrix_partial(self, base_sets):
+        base_list = []
+        set_list = []
+        to_process = []
+        added = set()
+        for s in base_sets:
+            k = frozenset([s])
+            if k in self.reduced_boundary_matrices:
+                to_process.append(k)
+                base_list.append(k)
+                added.add(k)
+        
+        while len(to_process) > 0:
+            old_to_process = to_process
+            print(old_to_process)
+            set_list.extend(old_to_process)
+            to_process = []
+            for t in old_to_process:
+                for s in base_list:
+                    k = t.union(s)
+                    if k in self.reduced_boundary_matrices and (not (k in added)):
+                        to_process.append(k)
+                        added.add(k)
+        lst = []
+        for s in set_list:
+            lst.extend(self.reduced_boundary_matrices[s])
+        bm = [v[1] for v in lst]
+        col_ids = [v[0] for v in lst]
+        return reduce_boundary_matrix(bm, self, col_ids)
 
 ##############################################################################
 
