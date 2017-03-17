@@ -41,8 +41,8 @@ class Simplex(object):
         result = []
         for v in self.set:
             s = self.set - frozenset([v])
-            if len(s) > 0:
-                result.append(s)
+            # if len(s) > 0:
+            result.append(s)
         return result
 
 ##############################################################################
@@ -131,6 +131,7 @@ class SimplicialComplex(object):
     def __init__(self, faces, vertex_order=set_lexicographical_key):
         self.face_sorter = lambda k: (len(k), vertex_order(k))
         self.face_set = set(faces)
+        self.face_set.add(frozenset())
         self.faces = []
         # Finds the closure of the set of faces
         to_process = sorted(faces, key=lambda k: len(k))
@@ -171,6 +172,7 @@ class Cover(object):
         self.subcomplexes = {}
         self.complex = cpx
         for face in cpx.face_set:
+            if len(face) == 0: continue
             dest = min(vertex_map[i] for i in face)
             subcomplex_map.setdefault(dest, []).append(face)
         for (complex_id, subcomplex_faces) in subcomplex_map.items():
